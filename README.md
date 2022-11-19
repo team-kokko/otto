@@ -1,5 +1,8 @@
 # kaggle_otto
 
+## 関連ページ
+- [実験管理](https://docs.google.com/spreadsheets/d/1Br1GpHDM-zCWoxzzBk4m5koF3EzXDhFOBjRc1t0Kt8A/edit#gid=0)
+
 ## 進め方
 タスクは、[プロジェクト](https://github.com/users/coffeemountain/projects/5/views/1?layout=board)を使って、下記のように管理
 
