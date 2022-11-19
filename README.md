@@ -19,4 +19,4 @@
 [これ](https://www.kaggle.com/product-feedback/295170)を読め！
 
 ### GithubのコードをKaggleに取り込む方法
-comming soon!
+coming soon!
