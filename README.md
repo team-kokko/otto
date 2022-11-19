@@ -12,3 +12,11 @@
 - タスクを開始する際は、ToDo→In Progressへ移動
 - 実装完了したら、Mainへマージ
 - マージ後、チケットのコメントに実装したcommitを貼り付けて、チケットをクローズ
+
+
+## Tips
+### KaggleのコードをGitHubに取り込む方法
+[これ](https://www.kaggle.com/product-feedback/295170)を読め！
+
+### GithubのコードをKaggleに取り込む方法
+comming soon!
