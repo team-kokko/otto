@@ -1,7 +1,6 @@
 
 from dataclasses import dataclass
 import datetime
-
 import os, sys, pickle, glob, gc
 
 # GPU使えるときは, cudfを読み込む
@@ -15,6 +14,10 @@ from utils import read_file
 
 @dataclass
 class Config:
+    # 対象のevent typeを持つlist (click: 0, cart: 1, order: 2)
+    # clickのみで集計する場合は、target_types = [0]
+    target_types: list
+
     # eventのtypeに重み(click: 0, cart: 1, order: 2)
     type_weight: dict
 
@@ -58,6 +61,7 @@ class CovisMatrixGenerator:
                     for i in range(1,self.READ_CT):
                         if k+i<b: df.append( read_file(files[k+i]) )
                     df = pd.concat(df,ignore_index=True,axis=0)
+                    df = df.loc[df['type'].isin(config.target_types)] # ONLY WANT CARTS AND ORDERS
                     df = df.sort_values(['session','ts'],ascending=[True,False])
                     # USE TAIL OF SESSION
                     df = df.reset_index(drop=True)
