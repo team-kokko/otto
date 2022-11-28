@@ -15,24 +15,36 @@ from utils import read_file
 @dataclass
 class Config:
     # 対象のevent typeを持つlist (click: 0, cart: 1, order: 2)
-    # clickのみで集計する場合は、target_types = [0]
-    target_types: list
+    # 何も指定しない場合は、全type選択
+    target_types: list = [0, 1, 2]
 
     # eventのtypeに重み(click: 0, cart: 1, order: 2)
-    type_weight: dict
+    weight_func: str = 'type_weight_1_1_1'
 
     # 1sessionでevent数の最小しきい値。この値未満のデータは弾く
-    min_event_threshold: int
+    min_event_threshold: int = 30
 
     # 共起とみなす最大の時間(単位: sec)。この値を超えて発生したevent同士は、同一sessionでも
-    max_sec_threshold: int
+    max_sec_threshold: int = 24 * 60 * 60
 
     # 1aidにつき, 保存する件数。これ以下のデータは切り捨てる
-    save_topk: int
+    save_topk: int = 15
 
     # 保存先
     output_dir: str = f"covis_matrix/{(datetime.datetime.now() + datetime.timedelta(hours=9)).strftime('%Y-%m-%d-%H%M%S')}"
 
+
+class WeightFuncMixin:
+    def type_weight_1_1_1(self, df):
+        type_weight = {0: 1, 1: 1, 2: 1}
+        return df.type_y.map(type_weight)
+
+    def type_weight_1_6_3(self, df):
+        type_weight = {0: 1, 1: 6, 2: 3}
+        return df.type_y.map(type_weight)
+
+    def time_weight_v1(self, df):
+        return 1 + 3*(df.ts_x - 1659304800)/(1662328791-1659304800)
 
 
 class CovisMatrixGenerator:
@@ -42,7 +54,14 @@ class CovisMatrixGenerator:
     CHUNK = 6
     SIZE = 1.86e6 / DISK_PIECES
 
+    def __init__(self, weight_func_mixin):
+        self.weight_func_mixin = weight_func_mixin
+
+    def _set_weight_func(self, func_name):
+        return getattr(self.weight_func_mixin, func_name)
+
     def generate(self, config, files):
+        weight_func = self._set_weight_func(config.weight_func)
         # COMPUTE IN PARTS FOR MEMORY MANGEMENT
         for PART in range(self.DISK_PIECES):
             print('### DISK PART',PART+1)
@@ -61,7 +80,7 @@ class CovisMatrixGenerator:
                     for i in range(1,self.READ_CT):
                         if k+i<b: df.append( read_file(files[k+i]) )
                     df = pd.concat(df,ignore_index=True,axis=0)
-                    df = df.loc[df['type'].isin(config.target_types)] # ONLY WANT CARTS AND ORDERS
+                    df = df.loc[df['type'].isin(config.target_types)]
                     df = df.sort_values(['session','ts'],ascending=[True,False])
                     # USE TAIL OF SESSION
                     df = df.reset_index(drop=True)
@@ -73,8 +92,8 @@ class CovisMatrixGenerator:
                     # MEMORY MANAGEMENT COMPUTE IN PARTS
                     df = df.loc[(df.aid_x >= PART*self.SIZE)&(df.aid_x < (PART+1)*self.SIZE)]
                     # ASSIGN WEIGHTS
-                    df = df[['session', 'aid_x', 'aid_y','type_y']].drop_duplicates(['session', 'aid_x', 'aid_y'])
-                    df['wgt'] = df.type_y.map(config.type_weight)
+                    df = df[['session', 'aid_x', 'aid_y','ts_x', 'type_y']].drop_duplicates(['session', 'aid_x', 'aid_y'])
+                    df['wgt'] = weight_func(df)
                     df = df[['aid_x','aid_y','wgt']]
                     df.wgt = df.wgt.astype('float32')
                     df = df.groupby(['aid_x','aid_y']).wgt.sum()
