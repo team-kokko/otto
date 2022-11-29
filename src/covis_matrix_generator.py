@@ -9,7 +9,7 @@ from typing import List
 class Config:
     # 対象のevent typeを持つlist (click: 0, cart: 1, order: 2)
     # 何も指定しない場合は、全type選択
-    target_types: List[int] = None # field(default_factory=lambda: [0, 1, 2])
+    target_types: List[int] = field(default_factory=lambda: [0, 1, 2])
 
     # eventに重みをつける関数。WeightFuncMixinで登録されている名前を利用
     weight_func: str = 'type_weight_1_1_1'
