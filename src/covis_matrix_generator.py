@@ -59,7 +59,7 @@ class CovisMatrixGenerator:
     def read(self, f):
         df = pd.read_parquet(f)
         df.ts = (df.ts/1000).astype('int32')
-        df['type'] = df['type'].map(type_labels).astype('int8')
+        df['type'] = df['type'].map(self.type_labels).astype('int8')
         if self.use_gpu:
             return cudf.DataFrame(df)
         return df
@@ -123,3 +123,20 @@ class CovisMatrixGenerator:
             # SAVE PART TO DISK (convert to pandas first uses less memory)
             os.makedirs(config.output_dir, exist_ok=True)
             tmp.to_pandas().to_parquet(f'{config.output_dir}/part_{PART}.pqt')
+
+
+if __name__ == '__main__':
+    files = glob.glob('./data/train_parquet/*.parquet')
+    weight_func_mixin = WeightFuncMixin()
+    config = Config(
+        target_types=[0, 1, 2],
+        weight_func='type_weight_1_6_3',
+        min_event_threshold=30,
+        max_sec_threshold=24*60*60,
+        save_topk=15,
+    )
+    covis_matrix_generator = CovisMatrixGenerator(
+        weight_func_mixin=weight_func_mixin, use_gpu=False
+    )
+
+    covis_matrix_generator.generate(config, files[:3])
