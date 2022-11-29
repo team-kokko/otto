@@ -5,6 +5,11 @@ import os, sys, pickle, glob, gc
 import pandas as pd
 from typing import List
 
+try:
+    import cudf
+except:
+    print('can not import cudf')
+
 
 @dataclass
 class Config:
