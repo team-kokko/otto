@@ -1,24 +1,17 @@
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import datetime
 import os, sys, pickle, glob, gc
-
-# GPU使えるときは, cudfを読み込む
-try:
-    import cudf as pd
-except:
-    import pandas as pd
-
-from utils import read_file
+from typing import List
 
 
 @dataclass
 class Config:
     # 対象のevent typeを持つlist (click: 0, cart: 1, order: 2)
     # 何も指定しない場合は、全type選択
-    target_types: list = [0, 1, 2]
+    target_types: List[int] = field(default_factory=lambda: [0, 1, 2])
 
-    # eventのtypeに重み(click: 0, cart: 1, order: 2)
+    # eventに重みをつける関数。WeightFuncMixinで登録されている名前を利用
     weight_func: str = 'type_weight_1_1_1'
 
     # 1sessionでevent数の最小しきい値。この値未満のデータは弾く
@@ -54,13 +47,23 @@ class CovisMatrixGenerator:
     CHUNK = 6
     SIZE = 1.86e6 / DISK_PIECES
 
-    def __init__(self, weight_func_mixin):
+    def __init__(self, weight_func_mixin, use_gpu=False):
         self.weight_func_mixin = weight_func_mixin
+        self.use_gpu = use_gpu
 
     def _set_weight_func(self, func_name):
         return getattr(self.weight_func_mixin, func_name)
 
-    def generate(self, config, files):
+    type_labels = {'clicks':0, 'carts':1, 'orders':2}
+    def read(self, f):
+        df = pd.read_parquet(f)
+        df.ts = (df.ts/1000).astype('int32')
+        df['type'] = df['type'].map(type_labels).astype('int8')
+        if self.use_gpu:
+            return cudf.DataFrame(df)
+        return df
+
+    def generate(self, config: Config, files: List[str]):
         weight_func = self._set_weight_func(config.weight_func)
         # COMPUTE IN PARTS FOR MEMORY MANGEMENT
         for PART in range(self.DISK_PIECES):
@@ -76,10 +79,13 @@ class CovisMatrixGenerator:
                 # => INNER self.CHUNKS
                 for k in range(a,b,self.READ_CT):
                     # READ FILE
-                    df = [read_file(files[k])]
+                    df = [self.read(files[k])]
                     for i in range(1,self.READ_CT):
-                        if k+i<b: df.append( read_file(files[k+i]) )
-                    df = pd.concat(df,ignore_index=True,axis=0)
+                        if k+i<b: df.append(self.read(files[k+i]))
+                    if self.use_gpu:
+                        df = cudf.concat(df,ignore_index=True,axis=0)
+                    else:
+                        df = pd.concat(df, ignore_index=True, axis=0)
                     df = df.loc[df['type'].isin(config.target_types)]
                     df = df.sort_values(['session','ts'],ascending=[True,False])
                     # USE TAIL OF SESSION
