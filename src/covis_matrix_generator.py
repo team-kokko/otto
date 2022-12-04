@@ -4,6 +4,7 @@ import datetime
 import os, sys, pickle, glob, gc
 import pandas as pd
 from typing import List
+import numpy as np
 
 try:
     import cudf
@@ -50,7 +51,6 @@ class CovisMatrixGenerator:
 
     DISK_PIECES = 4
     READ_CT = 5
-    CHUNK = 6
     SIZE = 1.86e6 / DISK_PIECES
 
     def __init__(self, weight_func_mixin, use_gpu=False):
@@ -59,6 +59,9 @@ class CovisMatrixGenerator:
 
     def _set_weight_func(self, func_name):
         return getattr(self.weight_func_mixin, func_name)
+
+    def _set_chunk(self, length):
+        self.CHUNK = int(np.ceil(length / 6))
 
     type_labels = {'clicks':0, 'carts':1, 'orders':2}
     def read(self, f):
@@ -70,6 +73,7 @@ class CovisMatrixGenerator:
         return df
 
     def generate(self, config: Config, files: List[str]):
+        self._set_chunk(files)
         weight_func = self._set_weight_func(config.weight_func)
         # COMPUTE IN PARTS FOR MEMORY MANGEMENT
         for PART in range(self.DISK_PIECES):
