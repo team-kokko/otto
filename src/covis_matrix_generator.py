@@ -73,7 +73,7 @@ class CovisMatrixGenerator:
         return df
 
     def generate(self, config: Config, files: List[str]):
-        self._set_chunk(files)
+        self._set_chunk(len(files))
         weight_func = self._set_weight_func(config.weight_func)
         # COMPUTE IN PARTS FOR MEMORY MANGEMENT
         for PART in range(self.DISK_PIECES):
