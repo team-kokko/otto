@@ -34,7 +34,7 @@ coming soon!
 
 1. Kaggleで新しいnotebookを作成する
 2. Add-ons -> Secrets -> Attach to Notebook にチェック -> Done
-3. File -> Import Notebook -> Githubアイコン -> Serchにレポジトリ名入力（coffeemountain/kaggle_otto） -> ブランチとファイルを選択 -> Import
+3. File -> Import Notebook -> Githubアイコン -> Serchにリポジトリ名入力（coffeemountain/kaggle_otto） -> ブランチとファイルを選択 -> Import
 
 ## 共有コード
 
