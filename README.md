@@ -30,6 +30,12 @@
 
 coming soon!
 
+### Github のnotebookを Kaggle に取り込む方法
+
+1. Kaggleで新しいnotebookを作成する
+2. Add-ons -> Secrets -> Attach to Notebook にチェック -> Done
+3. File -> Import Notebook -> Githubアイコン -> Serchにレポジトリ名入力（coffeemountain/kaggle_otto） -> ブランチとファイルを選択 -> Import
+
 ## 共有コード
 
 [共有コード説明用ドキュメント](./src/README.md)
