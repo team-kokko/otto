@@ -80,7 +80,7 @@ class CloudStorageClient:
 
     def save(self, data: str or bytes, filename: str, bucket_name: str):
         blob = self.client.bucket(bucket_name).blob(filename)
-        mode = 'w' if(isinstance(config.to_json(), str)) else 'wb'
+        mode = 'w' if(isinstance(data, str)) else 'wb'
         with blob.open(mode) as f:
             f.write(data)
 
@@ -165,7 +165,7 @@ class CovisMatrixGenerator:
                 print(f'Processing files {a} thru {b-1} in groups of {self.READ_CT}...')
 
                 # => INNER self.CHUNKS
-                for k in range(a,a+1,self.READ_CT):
+                for k in range(a,b,self.READ_CT):
                     # READ FILE
                     df = [self.read(files[k])]
                     for i in range(1,self.READ_CT):
@@ -222,7 +222,7 @@ class CovisMatrixGenerator:
             print('found same setting covis matrix. loading files ...')
             return self.cloud_storage_client.load_covis_matrix(data_dir)
 
-        print('Could not find same setting covis matrix. generating')
+        print('Could not find same setting covis matrix. generating ...')
         self.generate(config, files)
         self.cloud_storage_client.save(
             data=config.to_json(),
