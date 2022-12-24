@@ -226,7 +226,7 @@ class CovisMatrixGenerator:
         self.generate(config, files)
         self.cloud_storage_client.save(
             data=config.to_json(),
-            filename=config.output_dir + 'config.json',
+            filename=config.output_dir + '/config.json',
             bucket_name=self.BUCKET_NAME)
         return self.cloud_storage_client.load_covis_matrix(config.output_dir)
 
