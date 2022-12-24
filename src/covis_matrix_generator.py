@@ -1,10 +1,13 @@
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 import datetime
 import os, sys, pickle, glob, gc
+import json
 import pandas as pd
 from typing import List
 import numpy as np
+from google.cloud import storage
+from dataclasses_json import dataclass_json
 
 try:
     import cudf
@@ -12,6 +15,7 @@ except:
     print('can not import cudf')
 
 
+@dataclass_json
 @dataclass
 class Config:
     # 対象のevent typeを持つlist (click: 0, cart: 1, order: 2)
@@ -31,7 +35,30 @@ class Config:
     save_topk: int = 15
 
     # 保存先
-    output_dir: str = f"covis_matrix/{(datetime.datetime.now() + datetime.timedelta(hours=9)).strftime('%Y-%m-%d-%H%M%S')}"
+    output_dir: str = f"{(datetime.datetime.now() + datetime.timedelta(hours=9)).strftime('%Y-%m-%d-%H%M%S')}"
+
+    def is_same_setting(self, config):
+        """同じ設定のcovis matrixかどうかをチェック"""
+        no_need_matching_fields = ['output_dir']
+
+        my_conf_fields = [conf_field.name for conf_field in fields(self)]
+        comparison_fields = [conf_field.name for conf_field in fields(config)]
+
+        if my_conf_fields != comparison_fields:
+            return False
+
+        for field in my_conf_fields:
+            if field in no_need_matching_fields:
+                continue
+
+            if self.__getattribute__(field) != config.__getattribute__(field):
+                return False
+
+        return True
+
+    @staticmethod
+    def from_json(json_data):
+        return Config(**json_data)
 
 
 class WeightFuncMixin:
@@ -47,14 +74,63 @@ class WeightFuncMixin:
         return 1 + 3*(df.ts_x - 1659304800)/(1662328791-1659304800)
 
 
+class CloudStorageClient:
+    def __init__(self, project_name='kagglekokko-372522'):
+        self.client = storage.Client(project=project_name)
+
+    def save(self, data: str or bytes, filename: str, bucket_name: str):
+        blob = self.client.bucket(bucket_name).blob(filename)
+        mode = 'w' if(isinstance(config.to_json(), str)) else 'wb'
+        with blob.open(mode) as f:
+            f.write(data)
+
+    def save_dataframe(
+        self,
+        df: pd.DataFrame,
+        filename: str,
+        bucket_name: str
+            ):
+
+        blob = self.client.bucket(bucket_name).blob(filename)
+
+        with blob.open('wb') as f:
+            df.to_parquet(f)
+
+    def load_covis_matrix(self, data_dir: str):
+        blobs = self.client.list_blobs('covis_matrix')
+        data = []
+        for blob in blobs:
+            if (blob.name.startswith(data_dir)) \
+             & (not blob.name.endswith('config.json')):
+                with blob.open('rb') as f:
+                    data.append(pd.read_parquet(f))
+        return data
+
+    def exists_same_covis_matrix(self, config: Config):
+        blobs = self.client.list_blobs('covis_matrix')
+        for blob in blobs:
+            if blob.name.endswith('config.json'):
+                blob_config = Config.from_json(self.load_data(blob))
+                if config.is_same_setting(blob_config):
+                    return '/'.join(blob.name.split('/')[:-1])
+
+
 class CovisMatrixGenerator:
 
+    BUCKET_NAME = 'covis_matrix'
     DISK_PIECES = 4
     READ_CT = 5
     SIZE = 1.86e6 / DISK_PIECES
 
-    def __init__(self, weight_func_mixin, use_gpu=False):
+    def __init__(
+        self,
+        weight_func_mixin: WeightFuncMixin,
+        cloud_storage_client: CloudStorageClient,
+        use_gpu=False
+            ):
+
         self.weight_func_mixin = weight_func_mixin
+        self.cloud_storage_client = cloud_storage_client
         self.use_gpu = use_gpu
 
     def _set_weight_func(self, func_name):
@@ -87,7 +163,7 @@ class CovisMatrixGenerator:
                 print(f'Processing files {a} thru {b-1} in groups of {self.READ_CT}...')
 
                 # => INNER self.CHUNKS
-                for k in range(a,b,self.READ_CT):
+                for k in range(a,a+1,self.READ_CT):
                     # READ FILE
                     df = [self.read(files[k])]
                     for i in range(1,self.READ_CT):
@@ -129,9 +205,28 @@ class CovisMatrixGenerator:
             tmp = tmp.reset_index(drop=True)
             tmp['n'] = tmp.groupby('aid_x').aid_y.cumcount()
             tmp = tmp.loc[tmp.n<config.save_topk].drop('n',axis=1)
+
             # SAVE PART TO DISK (convert to pandas first uses less memory)
-            os.makedirs(config.output_dir, exist_ok=True)
-            tmp.to_pandas().to_parquet(f'{config.output_dir}/part_{PART}.pqt')
+            self.cloud_storage_client.save_dataframe(
+                df=tmp.to_pandas(),
+                filename=f'{config.output_dir}/part_{PART}.pqt',
+                bucket_name=self.BUCKET_NAME)
+
+    def load_or_generate(self, config: Config, files: List[str]):
+        """covis matrixデータを返却"""
+        data_dir = self.client.exists_same_covis_matrix(config)
+        # 同じ設定のデータが存在していたらロード
+        if data_dir:
+            print('found same setting covis matrix. loading files ...')
+            return self.load_covis_matrix(data_dir)
+
+        print('Could not find same setting covis matrix. generating')
+        self.generate(config, files)
+        self.cloud_storage_client.save(
+            data=config.to_json(),
+            filename=config.output_dir + 'config.json',
+            bucket_name=self.BUCKET_NAME)
+        return self.load_covis_matrix(config.output_dir)
 
 
 if __name__ == '__main__':
