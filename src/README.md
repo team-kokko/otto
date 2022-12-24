@@ -19,12 +19,13 @@ user_secrets = UserSecretsClient()
 personal_access_token = user_secrets.get_secret("personal_access_token")
 
 !rm -rf /kaggle/working/kaggle_otto
-!git clone https://$personal_access_token@github.com/coffeemountain/kaggle_otto.git
+!git clone -b gcs https://$personal_access_token@github.com/coffeemountain/kaggle_otto.git
 
 import sys
 sys.path.append('/kaggle/working/kaggle_otto/src')
 
 # 好きなcomponentをimportする
+!pip install dataclasses_json
 from covis_matrix_generator import *
 ```
 
