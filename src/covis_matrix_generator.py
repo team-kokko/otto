@@ -110,7 +110,9 @@ class CloudStorageClient:
         blobs = self.client.list_blobs('covis_matrix')
         for blob in blobs:
             if blob.name.endswith('config.json'):
-                blob_config = Config.from_json(self.load_data(blob))
+                with blob.open('r') as f:
+                    config_json = json.loads(f.read())
+                blob_config = Config.from_json(config_json)
                 if config.is_same_setting(blob_config):
                     return '/'.join(blob.name.split('/')[:-1])
 
@@ -214,11 +216,11 @@ class CovisMatrixGenerator:
 
     def load_or_generate(self, config: Config, files: List[str]):
         """covis matrixデータを返却"""
-        data_dir = self.client.exists_same_covis_matrix(config)
+        data_dir = self.cloud_storage_client.exists_same_covis_matrix(config)
         # 同じ設定のデータが存在していたらロード
         if data_dir:
             print('found same setting covis matrix. loading files ...')
-            return self.load_covis_matrix(data_dir)
+            return self.cloud_storage_client.load_covis_matrix(data_dir)
 
         print('Could not find same setting covis matrix. generating')
         self.generate(config, files)
@@ -226,7 +228,7 @@ class CovisMatrixGenerator:
             data=config.to_json(),
             filename=config.output_dir + 'config.json',
             bucket_name=self.BUCKET_NAME)
-        return self.load_covis_matrix(config.output_dir)
+        return self.cloud_storage_client.load_covis_matrix(config.output_dir)
 
 
 if __name__ == '__main__':
