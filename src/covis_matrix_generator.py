@@ -57,7 +57,7 @@ class Config:
         return True
 
     @staticmethod
-    def from_json(json_data):
+    def from_json(json_data: dict):
         return Config(**json_data)
 
 
@@ -111,7 +111,7 @@ class CloudStorageClient:
         for blob in blobs:
             if blob.name.endswith('config.json'):
                 with blob.open('r') as f:
-                    config_json = json.loads(f.read())
+                    config_json = f.read()
                 blob_config = Config.from_json(config_json)
                 if config.is_same_setting(blob_config):
                     return '/'.join(blob.name.split('/')[:-1])
