@@ -96,6 +96,21 @@ class CloudStorageClient:
         with blob.open('wb') as f:
             df.to_parquet(f)
 
+    def load_dataframe(self, df: pd.DataFrame, filename: str, bucket_name: str):
+        blob = self.client.bucket(bucket_name).blob(filename)
+
+        with blob.open('rb') as f:
+            data = pd.read_parquet(f)
+
+        return data
+
+    def exists_data(self, filename: str, bucket_name: str):
+        blobs = self.client.list_blobs(bucket_name)
+        for blob in blobs:
+            if blob.name == filename:
+                return True
+        return False
+
     def load_covis_matrix(self, data_dir: str):
         blobs = self.client.list_blobs('covis_matrix')
         data = []
