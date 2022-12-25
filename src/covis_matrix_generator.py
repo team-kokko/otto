@@ -96,7 +96,7 @@ class CloudStorageClient:
         with blob.open('wb') as f:
             df.to_parquet(f)
 
-    def load_dataframe(self, df: pd.DataFrame, filename: str, bucket_name: str):
+    def load_dataframe(self, filename: str, bucket_name: str):
         blob = self.client.bucket(bucket_name).blob(filename)
 
         with blob.open('rb') as f:
