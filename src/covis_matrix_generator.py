@@ -37,6 +37,21 @@ class Config:
     # 使用ファイル(ファイルのpathを書いておく)
     source_data: List[str] = field(default_factory=lambda: [])
 
+    def is_equal_source_data(self, comparison):
+        """作成環境(kaggleやcolab)に依存しない。どちらで作っても元のデータセットとファイルが同じなら同一の判定を返す"""
+
+        def _extract_data_and_file_name(source_data):
+            extracted_names = []
+            for file_ in source_data:
+                extracted_names.append('/'.join(file_.split('/')[-2:]))
+            return extracted_names
+
+        if _extract_data_and_file_name(self.source_data).sort() == \
+                _extract_data_and_file_name(comparison).sort():
+            return True
+
+        return False
+
     def is_same_setting(self, config):
         """同じ設定のcovis matrixかどうかをチェック"""
         my_conf_fields = [conf_field.name for conf_field in fields(self)]
@@ -45,9 +60,15 @@ class Config:
         if my_conf_fields != comparison_fields:
             return False
 
+        no_needs = ['source_data']
         for field in my_conf_fields:
+            if field in no_needs:
+                continue
             if self.__getattribute__(field) != config.__getattribute__(field):
                 return False
+
+        if not self.is_equal_source_data(config.source_data):
+            return False
 
         return True
 
